@@ -104,21 +104,23 @@ def create_vector_store(_chunks):
     return vector_store
 
 def process_question(question, vector_store):
-    """Retrieve context + call Gemini directly — no chains needed!"""
+    """Retrieve context + call Gemini directly"""
 
-    # Step 1: Semantic search → get relevant chunks
+    # Guard: make sure API key exists
+    if not GOOGLE_API_KEY:
+        return "❌ API key missing! Add GOOGLE_API_KEY in Streamlit Cloud → Settings → Secrets"
+
+    # Ensure the SDK can find the key via environment too
+    os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
+
     docs = vector_store.similarity_search(question, k=4)
-
-    # Step 2: Merge chunks into one context string
     context = "\n\n".join([doc.page_content for doc in docs])
 
-    # Step 3: Build the prompt manually
     prompt = f"""
     You are an expert AI assistant specialized in analyzing documents.
     Answer the question in detail based ONLY on the context below.
     If the answer is not in the context, say:
     "⚠️ This information is not available in the uploaded document."
-    Use bullet points or numbered lists where appropriate.
 
     Context:
     {context}
@@ -129,14 +131,13 @@ def process_question(question, vector_store):
     Detailed Answer:
     """
 
-    # Step 4: Call Gemini directly
+    # ✅ New v4.x style: use api_key + let temperature default
     model = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
-        google_api_key=GOOGLE_API_KEY,
-        temperature=1.0
+        api_key=GOOGLE_API_KEY,
     )
 
-    response = model.invoke([HumanMessage(content=prompt)])
+    response = model.invoke(prompt)
     return response.content
     
 # ─── Main App UI ───
