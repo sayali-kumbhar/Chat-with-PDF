@@ -184,6 +184,22 @@ with st.sidebar:
         col1, col2 = st.columns(2)
         col1.metric("Pages", st.session_state.get("num_pages", 0))
         col2.metric("Chunks", st.session_state.get("num_chunks", 0))
+        # ─── Reset Button ───
+    st.markdown("---")
+    if st.session_state.get("doc_processed"):
+        if st.button("🔄 Scan New Document", use_container_width=True):
+            # Clear everything
+            for key in ["vector_store", "doc_processed", 
+                        "num_chunks", "num_pages", "messages"]:
+                st.session_state.pop(key, None)
+            
+            # Clear cache so new doc gets freshly processed
+            st.cache_data.clear()
+            st.cache_resource.clear()
+            
+            st.success("✅ Ready for a new document!")
+            st.rerun()
+
     
     st.markdown("---")
     st.markdown("### 🛠️ Built With")
