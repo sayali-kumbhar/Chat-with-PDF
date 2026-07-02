@@ -1,5 +1,5 @@
-import streamlit as st
-from PyPDF2 import PdfReader
+# import streamlit as st
+# from PyPDF2 import PdfReader
 # from langchain.text_splitter import RecursiveCharacterTextSplitter
 # from langchain_huggingface import HuggingFaceEmbeddings
 # from langchain_community.vectorstores import FAISS
@@ -7,13 +7,22 @@ from PyPDF2 import PdfReader
 # from langchain.chains.combine_documents import create_stuff_documents_chain
 # from langchain.chains import create_retrieval_chain
 # from langchain.prompts import PromptTemplate
+# from langchain_text_splitters import RecursiveCharacterTextSplitter
+# from langchain_huggingface import HuggingFaceEmbeddings
+# from langchain_community.vectorstores import FAISS
+# from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain.chains.combine_documents import create_stuff_documents_chain
+# from langchain_core.prompts import PromptTemplate
+# import os
+
+import streamlit as st
+import os
+from PyPDF2 import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.prompts import PromptTemplate
-import os
+from langchain_core.messages import HumanMessage
 
 # ─── Page Config ───
 st.set_page_config(
@@ -94,40 +103,42 @@ def create_vector_store(_chunks):
     vector_store = FAISS.from_texts(_chunks, embedding=embeddings)
     return vector_store
 
-def get_conversational_chain():
-    prompt_template = """
-    You are an expert AI assistant specialized in analyzing documents. 
-    Answer the question in detail based on the provided context. 
-    If the answer is not in the context, say: "⚠️ This information is not available in the uploaded document."
-    Always be helpful and structured, use bullet points when appropriate.
+def process_question(question, vector_store):
+    """Retrieve context + call Gemini directly — no chains needed!"""
 
-    Context:\n{context}\n
-    Question:\n{input}\n
+    # Step 1: Semantic search → get relevant chunks
+    docs = vector_store.similarity_search(question, k=4)
+
+    # Step 2: Merge chunks into one context string
+    context = "\n\n".join([doc.page_content for doc in docs])
+
+    # Step 3: Build the prompt manually
+    prompt = f"""
+    You are an expert AI assistant specialized in analyzing documents.
+    Answer the question in detail based ONLY on the context below.
+    If the answer is not in the context, say:
+    "⚠️ This information is not available in the uploaded document."
+    Use bullet points or numbered lists where appropriate.
+
+    Context:
+    {context}
+
+    Question:
+    {question}
+
     Detailed Answer:
     """
 
+    # Step 4: Call Gemini directly
     model = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
         google_api_key=GOOGLE_API_KEY,
         temperature=1.0
     )
 
-    prompt = PromptTemplate(
-        template=prompt_template,
-        input_variables=["context", "input"]
-    )
-
-    chain = create_stuff_documents_chain(model, prompt)
-    return chain
-
-def process_question(question, vector_store):
-    docs = vector_store.similarity_search(question, k=4)
-    chain = get_conversational_chain()
-    response = chain.invoke({
-        "input": question,
-        "context": docs
-    })
-    return response
+    response = model.invoke([HumanMessage(content=prompt)])
+    return response.content
+    
 # ─── Main App UI ───
 st.markdown('<p class="main-header">📄 Chat with Your PDF</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Upload any PDF and ask questions — Powered by Google Gemini + RAG Pipeline</p>', unsafe_allow_html=True)
