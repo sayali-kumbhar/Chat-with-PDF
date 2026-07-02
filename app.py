@@ -4,7 +4,8 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.question_answering import load_qa_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain
 from langchain.prompts import PromptTemplate
 import os
 
@@ -89,49 +90,41 @@ def create_vector_store(_chunks):
     return vector_store
 
 def get_conversational_chain():
-    """Create the QA chain with a custom prompt"""
     prompt_template = """
     You are an expert AI assistant specialized in analyzing documents. 
     Answer the question in detail based on the provided context. 
     If the answer is not in the context, say: "⚠️ This information is not available in the uploaded document."
-    
-    Always be helpful, structured, and use bullet points or numbered lists when appropriate.
-    
-    Context:\n{context}\n
-    Question:\n{question}\n
+    Always be helpful and structured, use bullet points when appropriate.
 
+    Context:\n{context}\n
+    Question:\n{input}\n
     Detailed Answer:
     """
-    
-    # ✅ NEW - WORKING MODEL
+
     model = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    google_api_key=GOOGLE_API_KEY,
-    temperature=1.0
-)
-    
+        model="gemini-2.5-flash",
+        google_api_key=GOOGLE_API_KEY,
+        temperature=1.0
+    )
+
     prompt = PromptTemplate(
         template=prompt_template,
-        input_variables=["context", "question"]
+        input_variables=["context", "input"]
     )
-    
-    chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
+
+    chain = create_stuff_documents_chain(model, prompt)
     return chain
 
 def process_question(question, vector_store):
     """Process user question and return AI response"""
-    # Semantic search — find relevant chunks
     docs = vector_store.similarity_search(question, k=4)
-    
-    # Run QA chain
-    chain = get_conversational_chain()
-    response = chain.invoke(
-        {"input_documents": docs, "question": question},
-        return_only_outputs=True
-    )
-    
-    return response["output_text"]
 
+    chain = get_conversational_chain()
+    response = chain.invoke({
+        "input": question,
+        "context": docs
+    })
+    return response
 # ─── Main App UI ───
 st.markdown('<p class="main-header">📄 Chat with Your PDF</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Upload any PDF and ask questions — Powered by Google Gemini + RAG Pipeline</p>', unsafe_allow_html=True)
