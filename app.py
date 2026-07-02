@@ -1,12 +1,18 @@
 import streamlit as st
 from PyPDF2 import PdfReader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+# from langchain.text_splitter import RecursiveCharacterTextSplitter
+# from langchain_huggingface import HuggingFaceEmbeddings
+# from langchain_community.vectorstores import FAISS
+# from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain.chains.combine_documents import create_stuff_documents_chain
+# from langchain.chains import create_retrieval_chain
+# from langchain.prompts import PromptTemplate
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains import create_retrieval_chain
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 import os
 
 # ─── Page Config ───
@@ -71,7 +77,6 @@ def extract_pdf_text(pdf_files):
 
 @st.cache_data
 def split_text_into_chunks(text):
-    """Split text into manageable chunks for embedding"""
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
@@ -116,9 +121,7 @@ def get_conversational_chain():
     return chain
 
 def process_question(question, vector_store):
-    """Process user question and return AI response"""
     docs = vector_store.similarity_search(question, k=4)
-
     chain = get_conversational_chain()
     response = chain.invoke({
         "input": question,
